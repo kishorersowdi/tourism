@@ -1,0 +1,93 @@
+# for data manipulation
+import pandas as pd
+import sklearn
+
+# for creating a folder
+import os
+
+# for data preprocessing and pipeline creation
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+
+# for hugging face space authentication to upload files
+from huggingface_hub import login, HfApi
+
+# Define constants for the dataset and output paths
+api = HfApi(token=os.getenv("HF_TOKEN"))
+DATASET_PATH = "hf://datasets/kishoresowdi/visit-with-us/tourism.csv"
+data = pd.read_csv(DATASET_PATH)
+print("Dataset loaded successfully.")
+
+# Data Cleaning steps
+
+# Merge 'Fe Male' into 'Female' in 'Gender' column
+data['Gender'] = data['Gender'].replace('Fe Male', 'Female')
+
+# Merge 'Unmarried' and 'Single' into 'Single' in 'MaritalStatus' column
+data['MaritalStatus'] = data['MaritalStatus'].replace('Unmarried', 'Single')
+
+# Drop unnecessary columns
+data = data.drop(columns=[
+    'Unnamed: 0', 
+    'CustomerID',
+    'Designation']) # duplicate of ProductPitched
+
+# Define the target variable for the classification task
+target = 'ProdTaken'
+
+# List of numerical features in the dataset (adjusted for tourism.csv)
+numeric_features = [
+    'Age',
+    'CityTier',
+    'DurationOfPitch',
+    'NumberOfPersonVisiting',
+    'NumberOfFollowups',
+    'PreferredPropertyStar',
+    'NumberOfTrips',
+    'Passport',
+    'PitchSatisfactionScore',
+    'OwnCar',
+    'NumberOfChildrenVisiting',
+    'MonthlyIncome'
+]
+
+# List of categorical features in the dataset
+categorical_features = [
+    'TypeofContact',
+    'Occupation',
+    'Gender',
+    'ProductPitched',
+    'MaritalStatus'
+]
+
+# Define predictor matrix (X) using selected numeric and categorical features
+X = data[numeric_features + categorical_features]
+
+# Define target variable
+y = data[target]
+
+
+# Split dataset into train and test
+# Split the dataset into training and test sets
+Xtrain, Xtest, ytrain, ytest = train_test_split(
+    X, y,              # Predictors (X) and target variable (y)
+    test_size=0.2,     # 20% of the data is reserved for testing
+    random_state=42,   # Ensures reproducibility by setting a fixed random seed,
+    stratify=y         # Stratify the split based on the target variable
+)
+
+Xtrain.to_csv("Xtrain.csv",index=False)
+Xtest.to_csv("Xtest.csv",index=False)
+ytrain.to_csv("ytrain.csv",index=False)
+ytest.to_csv("ytest.csv",index=False)
+
+# Upload the resulting train and test datasets back to the Hugging Face data space
+files = ["Xtrain.csv","Xtest.csv","ytrain.csv","ytest.csv"]
+
+for file_path in files:
+    api.upload_file(
+        path_or_fileobj=file_path,
+        path_in_repo=file_path.split("/")[-1],  # just the filename
+        repo_id="kishoresowdi/visit-with-us",
+        repo_type="dataset",
+    )
